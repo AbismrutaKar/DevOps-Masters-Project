@@ -18,4 +18,5 @@ jobs:
           terraform_version: 1.5.7
 
       - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.0
+        run: tfsec --exclude-downloaded-modules .
+
