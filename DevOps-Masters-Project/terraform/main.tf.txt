@@ -1,0 +1,78 @@
+provider "aws" {
+  region = "us-east-1"
+}
+
+# 1. S3 Bucket to store your source code (code.zip)
+resource "aws_s3_bucket" "source" {
+  bucket = "my-source-bucket-12345"   # Change if bucket name is already taken
+  force_destroy = true
+}
+
+# 2. S3 Bucket to store build artifacts
+resource "aws_s3_bucket" "artifact" {
+  bucket = "my-artifact-bucket-12345" # Change if bucket name is already taken
+  force_destroy = true
+}
+
+# 3. IAM Role for CodePipeline to work
+resource "aws_iam_role" "codepipeline_role" {
+  name = "codepipeline-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "codepipeline.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
+  role       = aws_iam_role.codepipeline_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipelineFullAccess"
+}
+
+# 4. CodePipeline itself
+resource "aws_codepipeline" "my_pipeline" {
+  name     = "MyDemoPipeline"
+  role_arn = aws_iam_role.codepipeline_role.arn
+
+  artifact_store {
+    location = aws_s3_bucket.artifact.bucket
+    type     = "S3"
+  }
+
+  stage {
+    name = "Source"
+
+    action {
+      name             = "SourceAction"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "S3"
+      version          = "1"
+      output_artifacts = ["source_output"]
+
+      configuration = {
+        S3Bucket    = aws_s3_bucket.source.bucket
+        S3ObjectKey = "code.zip"  # We'll upload this file manually later
+      }
+    }
+  }
+
+  stage {
+    name = "Approval"
+
+    action {
+      name            = "ManualApproval"
+      category        = "Approval"
+      owner           = "AWS"
+      provider        = "Manual"
+      version         = "1"
+      input_artifacts = ["source_output"]
+    }
+  }
+}
